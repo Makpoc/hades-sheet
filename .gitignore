@@ -15,3 +15,5 @@
 
 # API token store
 client_secret.json
+# Binary from go build
+hades-sheet
