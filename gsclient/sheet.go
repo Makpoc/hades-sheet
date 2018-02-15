@@ -18,6 +18,9 @@ import (
 	sheets "google.golang.org/api/sheets/v4"
 )
 
+const minRowN = 1
+const maxRowN = 999
+
 // Sheet contains reference to Google sheets service together with sheet ID
 type Sheet struct {
 	id      string
