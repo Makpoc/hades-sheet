@@ -2,17 +2,11 @@ package gsclient
 
 import (
 	"fmt"
+	"github.com/makpoc/hades-sheet/models"
 )
 
-// UserTime contains information about users and their time
-type UserTime struct {
-	UserName    string
-	CurrentTime string
-	Offset      string
-}
-
 // GetTimeZones returns the list with users and their corresponding offset and currentTime
-func (s *Sheet) GetTimeZones() ([]UserTime, error) {
+func (s *Sheet) GetTimeZones() ([]models.UserTime, error) {
 	const userColumn = "A"
 	const offsetColumn = "C"
 	users, err := s.service.Spreadsheets.Values.Get(s.id, fmt.Sprintf("%s!%s%d:%s%d", tzSheet, userColumn, minRowN, offsetColumn, maxRowN)).Do()
@@ -25,13 +19,13 @@ func (s *Sheet) GetTimeZones() ([]UserTime, error) {
 	}
 
 	values := getDataSubset(users.Values)
-	var result []UserTime
+	var result []models.UserTime
 	for _, v := range values {
 		if len(v) == 0 {
 			// empty row, skip
 			continue
 		}
-		entry := UserTime{}
+		entry := models.UserTime{}
 		switch len(v) {
 		case 3:
 			entry.Offset = fmt.Sprintf("%s", v[2])

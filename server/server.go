@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/makpoc/hades-sheet/gsclient"
@@ -31,8 +32,8 @@ func Start() error {
 	router := mux.NewRouter().StrictSlash(true)
 	s := router.PathPrefix("/api/v1").Subrouter()
 
-	s.HandleFunc("/timezones", TimeZonesHandler)
-	s.HandleFunc("/users", UsersHandler)
+	s.HandleFunc("/timezones", auth(timeLogger(timeZonesHandler)))
+	s.HandleFunc("/users", auth(timeLogger(usersHandler)))
 
 	var err error
 	sheet, err = initSheet()
@@ -44,8 +45,37 @@ func Start() error {
 	return http.ListenAndServe(":3000", s)
 }
 
-func TimeZonesHandler(res http.ResponseWriter, req *http.Request) {
+// auth provides uthorization layer based on secret in query parameter
+func auth(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var secret string
+		var ok bool
+		if secret, ok = os.LookupEnv("secret"); !ok {
+			// server was not configured with secret
+			h.ServeHTTP(w, r)
+			return
+		}
 
+		querySecret := r.URL.Query().Get("secret")
+		if querySecret != "" && querySecret == secret {
+			h.ServeHTTP(w, r)
+			return
+		}
+		sendError(w, http.StatusForbidden, fmt.Errorf("unauthorized"))
+		return
+	})
+}
+
+// timeLogger logs response times
+func timeLogger(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		startTime := time.Now()
+		defer log.Printf("It took %s to respond to TimeZone request", time.Since(startTime))
+		h.ServeHTTP(res, req)
+	})
+}
+
+func timeZonesHandler(res http.ResponseWriter, req *http.Request) {
 	result, err := sheet.GetTimeZones()
 	if err != nil {
 		log.Printf("Failed to get time zones: %v\n", err)
@@ -63,7 +93,7 @@ func TimeZonesHandler(res http.ResponseWriter, req *http.Request) {
 	res.Write(body)
 }
 
-func UsersHandler(res http.ResponseWriter, req *http.Request) {
+func usersHandler(res http.ResponseWriter, req *http.Request) {
 	result, err := sheet.GetUsers()
 	if err != nil {
 		log.Printf("Failed to get Users: %v\n", err)
@@ -71,7 +101,7 @@ func UsersHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	body, err := json.MarshalIndent(result, "", "    ")
+	body, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		log.Printf("Failed to marshal json: %v\n", err)
 		sendError(res, http.StatusBadRequest, fmt.Errorf("Failed to marshal json: %v\n", err))
